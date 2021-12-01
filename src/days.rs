@@ -1,3 +1,5 @@
 use aoc_lib::Day;
 
-pub static DAYS: &[Day] = &[];
+mod day01;
+
+pub static DAYS: &[Day] = &[day01::DAY];
