@@ -45,10 +45,7 @@ mod tests_template {
 
     #[test]
     fn part1_test() {
-        let data = aoc_lib::input(2021, 1)
-            .example(Example::Part1, 1)
-            .open()
-            .unwrap();
+        let data = aoc_lib::input(1).example(Example::Part1, 1).open().unwrap();
 
         let data: Vec<_> = data
             .lines()
@@ -64,10 +61,7 @@ mod tests_template {
 
     #[test]
     fn part2_test() {
-        let data = aoc_lib::input(2021, 1)
-            .example(Example::Part1, 1)
-            .open()
-            .unwrap();
+        let data = aoc_lib::input(1).example(Example::Part1, 1).open().unwrap();
 
         let data: Vec<_> = data
             .lines()
