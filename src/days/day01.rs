@@ -33,9 +33,9 @@ fn part1(depths: &[u32]) -> usize {
 }
 
 fn part2(depths: &[u32]) -> usize {
-    let windows: Vec<_> = ArrWindows::new(depths).map(|[a, b, c]| a + b + c).collect();
-
-    ArrWindows::new(&windows).filter(|[a, b]| b > a).count()
+    ArrWindows::new(depths)
+        .filter(|[a, b, c, d]| b + c + d > a + b + c)
+        .count()
 }
 
 #[cfg(test)]
