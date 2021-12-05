@@ -69,7 +69,7 @@ impl Line {
     }
 }
 fn part1(lines: &[Line]) -> usize {
-    let mut point_map = vec![0; 1000 * 1000];
+    let mut point_map = vec![0u8; 1000 * 1000];
 
     for line in lines
         .iter()
@@ -81,7 +81,7 @@ fn part1(lines: &[Line]) -> usize {
             let upper = line.start.y.max(line.end.y);
             (lower..=upper).for_each(|y| {
                 let idx = y as usize * 1000 + line.start.x as usize;
-                point_map[idx] += 1;
+                point_map[idx] = point_map[idx].saturating_add(1);
             });
         } else {
             // Horizontal line!
@@ -89,7 +89,7 @@ fn part1(lines: &[Line]) -> usize {
             let upper = line.start.x.max(line.end.x);
             (lower..=upper).for_each(|x| {
                 let idx = line.start.y as usize * 1000 + x as usize;
-                point_map[idx] += 1;
+                point_map[idx] = point_map[idx].saturating_add(1);
             });
         }
     }
@@ -98,7 +98,7 @@ fn part1(lines: &[Line]) -> usize {
 }
 
 fn part2(lines: &[Line]) -> usize {
-    let mut point_map = vec![0; 1000 * 1000];
+    let mut point_map = vec![0u8; 1000 * 1000];
 
     for line in lines.iter() {
         let dy = match line.start.y.cmp(&line.end.y) {
@@ -117,7 +117,7 @@ fn part2(lines: &[Line]) -> usize {
 
         loop {
             let idx = y as usize * 1000 + x as usize;
-            point_map[idx] += 1;
+            point_map[idx] = point_map[idx].saturating_add(1);
             if x == line.end.x && y == line.end.y {
                 break;
             }
