@@ -36,8 +36,16 @@ fn parse(input: &str) -> Result<[u64; 9]> {
 
 fn part1(mut shoal: [u64; 9], ticks: u16) -> u64 {
     for _ in 0..ticks {
-        shoal.rotate_left(1);
-        shoal[6] += shoal[8];
+        let start = shoal[0];
+        shoal[0] = shoal[1];
+        shoal[1] = shoal[2];
+        shoal[2] = shoal[3];
+        shoal[3] = shoal[4];
+        shoal[4] = shoal[5];
+        shoal[5] = shoal[6];
+        shoal[6] = shoal[7] + start;
+        shoal[7] = shoal[8];
+        shoal[8] = start;
     }
 
     shoal.iter().sum()
