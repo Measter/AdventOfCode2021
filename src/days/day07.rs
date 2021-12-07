@@ -1,4 +1,4 @@
-use aoc_lib::{day, Bench, BenchResult, NoError, UserError};
+use aoc_lib::{day, Bench, BenchResult, UserError};
 
 day! {
    day 7: "The Treachery of Whales"
@@ -14,7 +14,7 @@ fn run_part1(input: &str, b: Bench) -> BenchResult {
         .collect::<Result<_, _>>()
         .map_err(UserError)?;
 
-    b.bench(|| Ok::<_, NoError>(find_fuel(&crabs, part1_fuel)))
+    b.bench(|| find_fuel(&crabs, part1_fuel))
 }
 
 fn run_part2(input: &str, b: Bench) -> BenchResult {
@@ -25,7 +25,7 @@ fn run_part2(input: &str, b: Bench) -> BenchResult {
         .collect::<Result<_, _>>()
         .map_err(UserError)?;
 
-    b.bench(|| Ok::<_, NoError>(find_fuel(&crabs, part2_fuel)))
+    b.bench(|| find_fuel(&crabs, part2_fuel))
 }
 
 fn part1_fuel(n: u32) -> u32 {
@@ -36,43 +36,61 @@ fn part2_fuel(n: u32) -> u32 {
     (n * (n + 1)) / 2
 }
 
-fn find_fuel(crabs: &[u32], fuel_cost: impl Fn(u32) -> u32) -> u32 {
-    let max_crab = crabs.iter().max().copied().unwrap() as usize + 1;
-    let mut crab_by_pos = vec![0; max_crab];
-    for &crab in crabs {
-        crab_by_pos[crab as usize] += 1;
+#[derive(Debug, Clone, Copy)]
+struct Position {
+    pos: u32,
+    num_crabs: u32,
+}
+
+fn find_fuel(crabs: &[u32], fuel_cost: impl Fn(u32) -> u32) -> Result<u32, &'static str> {
+    let mut crab_by_pos: Vec<Position> = Vec::new();
+    for crab in crabs {
+        match crab_by_pos.binary_search_by(|cp| cp.pos.cmp(crab)) {
+            Ok(idx) => crab_by_pos[idx].num_crabs += 1,
+            Err(idx) => crab_by_pos.insert(
+                idx,
+                Position {
+                    pos: *crab,
+                    num_crabs: 1,
+                },
+            ),
+        }
     }
 
-    (0..max_crab)
-        .map(|i| {
-            let left_fuel: u32 = crab_by_pos[..i]
-                .iter()
-                .enumerate()
-                .map(|(pos, &c)| {
-                    let n = i - pos;
-                    let fuel = fuel_cost(n as u32);
-                    fuel as u32 * c
-                })
-                .sum();
+    let last_crab = crab_by_pos.last().unwrap().pos;
+    let mut cur_idx = 0;
+    let mut cur_fuel = u32::MAX;
 
-            let right_fuel = crab_by_pos
-                .get((i + 1)..)
-                .map(|sbs| {
-                    sbs.iter()
-                        .zip((i + 1)..)
-                        .map(|(&c, pos)| {
-                            let n = pos - i;
-                            let fuel = fuel_cost(n as u32);
-                            fuel as u32 * c
-                        })
-                        .sum()
-                })
-                .unwrap_or(u32::MAX);
+    for pos in 0..=last_crab {
+        if crab_by_pos[cur_idx].pos == pos {
+            cur_idx += 1;
+        }
 
-            left_fuel.saturating_add(right_fuel)
-        })
-        .min()
-        .unwrap()
+        let right_fuel = crab_by_pos[cur_idx..]
+            .iter()
+            .map(|crab_pos| {
+                let n = crab_pos.pos - pos;
+                fuel_cost(n) * crab_pos.num_crabs
+            })
+            .sum();
+        let left_fuel: u32 = crab_by_pos[..cur_idx]
+            .iter()
+            .map(|crab_pos| {
+                let n = pos - crab_pos.pos;
+                fuel_cost(n) * crab_pos.num_crabs
+            })
+            .sum();
+
+        let total_fuel = left_fuel.saturating_add(right_fuel);
+        if total_fuel > cur_fuel {
+            return Ok(cur_fuel);
+        }
+        cur_fuel = total_fuel;
+
+        if crab_by_pos[cur_idx].pos == pos {}
+    }
+
+    Err("No minimum fuel!?")
 }
 
 #[cfg(test)]
@@ -90,7 +108,7 @@ mod tests_template {
             .collect::<Result<_, _>>()
             .unwrap();
 
-        assert_eq!(37, find_fuel(&crabs, part1_fuel));
+        assert_eq!(37, find_fuel(&crabs, part1_fuel).unwrap());
     }
 
     #[test]
@@ -103,6 +121,6 @@ mod tests_template {
             .collect::<Result<_, _>>()
             .unwrap();
 
-        assert_eq!(168, find_fuel(&crabs, part2_fuel));
+        assert_eq!(168, find_fuel(&crabs, part2_fuel).unwrap());
     }
 }
