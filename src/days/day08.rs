@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use aoc_lib::{day, Bench, BenchResult, NoError, UserError};
 use color_eyre::eyre::{eyre, Result};
 
@@ -70,96 +68,99 @@ fn part1(data: &[Data]) -> u16 {
         .sum()
 }
 
+fn make_map<const N: usize>(segments: &[u8]) -> [u8; N] {
+    let mut map = [0; N];
+    map[..segments.len()].copy_from_slice(segments);
+    map.sort_unstable();
+    map
+}
+
 fn decode_signals(data: Data) -> u64 {
     // Just look for the 1, 4, and 7 cases.
-    let mut one_chars = BTreeSet::new();
-    let mut four_chars = BTreeSet::new();
-    let mut seven_chars = BTreeSet::new();
+    let mut one_chars = [0; 2];
+    let mut four_chars = [0; 4];
+    let mut seven_chars = [0; 3];
 
-    for output in data.signals.into_iter().chain(data.outputs) {
+    for output in data.signals {
         match output.len() {
-            2 => {
-                if one_chars.is_empty() {
-                    one_chars.extend(output.chars());
-                }
-            }
-            4 => {
-                if four_chars.is_empty() {
-                    four_chars.extend(output.chars());
-                }
-            }
-            3 => {
-                if seven_chars.is_empty() {
-                    seven_chars.extend(output.chars());
-                }
-            }
+            2 if one_chars[0] == 0 => one_chars = make_map(output.as_bytes()),
+            4 if four_chars[0] == 0 => four_chars = make_map(output.as_bytes()),
+            3 if seven_chars[0] == 0 => seven_chars = make_map(output.as_bytes()),
             _ => {}
         }
     }
 
     // We know that anything found in the one-chars can only be the C or F segments.
     // We'll filter them out from the four_chars and seven_chars.
-    for char in &one_chars {
-        four_chars.remove(char);
-        seven_chars.remove(char);
+    for char in one_chars {
+        four_chars.iter_mut().for_each(|fc| {
+            if *fc == char {
+                *fc = 0
+            }
+        });
+        seven_chars.iter_mut().for_each(|sc| {
+            if *sc == char {
+                *sc = 0
+            }
+        });
     }
-    let cf_pos = BTreeSet::from_iter(one_chars.iter().copied());
+    four_chars.sort_unstable();
+    seven_chars.sort_unstable();
 
     // The one segment left for the seven_chars will fix where the A segment is.
-    let a_seg = *seven_chars.iter().next().unwrap();
+    let [.., a_seg] = seven_chars;
 
     // After filtering, we know that what's left in four_chars must be the B and D
     // segments.
-    let bd_pos = BTreeSet::from_iter(four_chars.iter().copied());
 
     // We can find the G segment by looking at the signals for the 9 character.
     // It's the one with 6 lit segments, but only a single unknown.
-    let mut one_chars_iter = one_chars.iter();
-    let (&one_a, &one_b) = one_chars_iter.next().zip(one_chars_iter.next()).unwrap();
-    let mut four_chars_iter = four_chars.iter();
-    let (&four_a, &four_b) = four_chars_iter.next().zip(four_chars_iter.next()).unwrap();
-    let mut zero_chars = BTreeSet::new();
-    let mut nine_chars = BTreeSet::new();
-    let mut six_chars = BTreeSet::new();
+    let [one_a, one_b] = one_chars;
+    let [.., four_a, four_b] = four_chars;
+    let mut zero_chars = [0; 6];
+    let mut nine_chars = [0; 6];
+    let mut six_chars = [0; 6];
 
     for d in data
         .signals
         .into_iter()
-        .chain(data.outputs)
         .filter(|d| d.len() == 6)
+        .map(|d| d.as_bytes())
     {
-        if !d.contains(four_a) || !d.contains(four_b) {
-            zero_chars.extend(d.chars());
-        } else if d.contains(one_a) && d.contains(one_b) {
+        if !d.contains(&four_a) || !d.contains(&four_b) {
+            zero_chars = make_map(d);
+        } else if d.contains(&one_a) && d.contains(&one_b) {
             // The 9 char.
-            nine_chars.extend(d.chars());
+            nine_chars = make_map(d);
         } else {
             // The 6 char.
-            six_chars.extend(d.chars());
+            six_chars = make_map(d);
         }
     }
 
     // We can find out which one G is by filtering out all known characters from
     // nine_chars.
-    let mut known_segments: BTreeSet<_> = cf_pos
-        .iter()
-        .chain(&bd_pos)
-        .chain(std::iter::once(&a_seg))
-        .copied()
-        .collect();
+    let g_seg = (|| {
+        let known_segments = [one_a, one_b, four_a, four_b, a_seg];
+        for nc in nine_chars {
+            if !known_segments.contains(&nc) {
+                return nc;
+            }
+        }
+        panic!("bad nine-char");
+    })();
 
-    nine_chars.retain(|c| !known_segments.contains(c));
-    assert_eq!(nine_chars.len(), 1);
-
-    let g_seg = *nine_chars.iter().next().unwrap();
     // We know where G is, add it to the known segments and filter the 6 character
     // for the E segment.
-    known_segments.insert(g_seg);
-    let six_chars2 = six_chars.clone();
-    six_chars.retain(|c| !known_segments.contains(c));
-    assert_eq!(six_chars.len(), 1);
-
-    let e_seg = *six_chars.iter().next().unwrap();
+    let e_seg = (|| {
+        let known_segments = [one_a, one_b, four_a, four_b, a_seg, g_seg];
+        for nc in six_chars {
+            if !known_segments.contains(&nc) {
+                return nc;
+            }
+        }
+        panic!("bad six-char");
+    })();
 
     // We've now fixed the A, E, and G segments.
     // We can fix the B and D segments by looking at which one in the zero_char
@@ -172,44 +173,39 @@ fn decode_signals(data: Data) -> u64 {
 
     // Now fixed the A, B, D, E, and G segments.
     // The 6 character only has F, not C. Check for one_chars in there.
-    let (c_seg, f_seg) = if six_chars2.contains(&one_a) {
+    let (c_seg, f_seg) = if six_chars.contains(&one_a) {
         (one_b, one_a)
     } else {
         (one_a, one_b)
     };
 
-    let char_map = [
+    let char_map: [[u8; 7]; 10] = [
         // 0
-        BTreeSet::from_iter([a_seg, b_seg, c_seg, e_seg, f_seg, g_seg]),
+        make_map(&[a_seg, b_seg, c_seg, e_seg, f_seg, g_seg]),
         // 1
-        BTreeSet::from_iter([c_seg, f_seg]),
+        make_map(&[c_seg, f_seg]),
         // 2
-        BTreeSet::from_iter([a_seg, c_seg, d_seg, e_seg, g_seg]),
+        make_map(&[a_seg, c_seg, d_seg, e_seg, g_seg]),
         // 3
-        BTreeSet::from_iter([a_seg, c_seg, d_seg, f_seg, g_seg]),
+        make_map(&[a_seg, c_seg, d_seg, f_seg, g_seg]),
         // 4
-        BTreeSet::from_iter([b_seg, c_seg, d_seg, f_seg]),
+        make_map(&[b_seg, c_seg, d_seg, f_seg]),
         // 5
-        BTreeSet::from_iter([a_seg, b_seg, d_seg, f_seg, g_seg]),
+        make_map(&[a_seg, b_seg, d_seg, f_seg, g_seg]),
         // 6
-        BTreeSet::from_iter([a_seg, b_seg, d_seg, e_seg, f_seg, g_seg]),
+        make_map(&[a_seg, b_seg, d_seg, e_seg, f_seg, g_seg]),
         // 7
-        BTreeSet::from_iter([a_seg, c_seg, f_seg]),
+        make_map(&[a_seg, c_seg, f_seg]),
         // 8
-        BTreeSet::from_iter([a_seg, b_seg, c_seg, d_seg, e_seg, f_seg, g_seg]),
+        make_map(&[a_seg, b_seg, c_seg, d_seg, e_seg, f_seg, g_seg]),
         // 9
-        BTreeSet::from_iter([a_seg, b_seg, c_seg, d_seg, f_seg, g_seg]),
+        make_map(&[a_seg, b_seg, c_seg, d_seg, f_seg, g_seg]),
     ];
 
-    // dbg!(a_seg, b_seg, c_seg, d_seg, e_seg, f_seg, g_seg);
-
     let mut sum = 0;
-    let mut segment_map = BTreeSet::new();
-
     for output in data.outputs {
         sum *= 10;
-        segment_map.clear();
-        segment_map.extend(output.chars());
+        let segment_map: [u8; 7] = make_map(output.as_bytes());
 
         for (map, n) in char_map.iter().zip(0..) {
             if map != &segment_map {
