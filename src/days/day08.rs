@@ -1,5 +1,6 @@
 use aoc_lib::{day, Bench, BenchResult, NoError, UserError};
 use color_eyre::eyre::{eyre, Result};
+use nom::AsBytes;
 
 day! {
    day 8: "Seven Segment Search"
@@ -68,27 +69,21 @@ fn part1(data: &[Data]) -> u16 {
         .sum()
 }
 
-fn make_map<const N: usize>(segments: &[u8]) -> [u8; N] {
-    let mut map = [0; N];
+fn make_map(segments: &[u8]) -> [u8; 7] {
+    let mut map = [0; 7];
     map[..segments.len()].copy_from_slice(segments);
     map.sort_unstable();
     map
 }
 
-fn decode_signals(data: Data) -> u64 {
-    // Just look for the 1, 4, and 7 cases.
-    let mut one_chars = [0; 2];
-    let mut four_chars = [0; 4];
-    let mut seven_chars = [0; 3];
+fn decode_signals(mut data: Data) -> u64 {
+    data.signals.sort_unstable_by_key(|s| s.len());
+    // dbg!(data.signals);
+    // panic!();
 
-    for output in data.signals {
-        match output.len() {
-            2 if one_chars[0] == 0 => one_chars = make_map(output.as_bytes()),
-            4 if four_chars[0] == 0 => four_chars = make_map(output.as_bytes()),
-            3 if seven_chars[0] == 0 => seven_chars = make_map(output.as_bytes()),
-            _ => {}
-        }
-    }
+    // Just look for the 1, 4, and 7 cases.
+    let one_chars: [u8; 2] = data.signals[0].as_bytes().try_into().unwrap();
+    let mut four_chars: [u8; 4] = data.signals[2].as_bytes().try_into().unwrap();
 
     // We know that anything found in the one-chars can only be the C or F segments.
     // We'll filter them out from the four_chars and seven_chars.
@@ -98,17 +93,20 @@ fn decode_signals(data: Data) -> u64 {
                 *fc = 0
             }
         });
-        seven_chars.iter_mut().for_each(|sc| {
-            if *sc == char {
-                *sc = 0
-            }
-        });
     }
     four_chars.sort_unstable();
-    seven_chars.sort_unstable();
 
     // The one segment left for the seven_chars will fix where the A segment is.
-    let [.., a_seg] = seven_chars;
+    // let [.., a_seg] = seven_chars;
+    let a_seg = {
+        let mut seg = 0;
+        for sc in data.signals[1].as_bytes() {
+            if !one_chars.contains(sc) {
+                seg = *sc;
+            }
+        }
+        seg
+    };
 
     // After filtering, we know that what's left in four_chars must be the B and D
     // segments.
@@ -121,46 +119,45 @@ fn decode_signals(data: Data) -> u64 {
     let mut nine_chars = [0; 6];
     let mut six_chars = [0; 6];
 
-    for d in data
-        .signals
-        .into_iter()
-        .filter(|d| d.len() == 6)
-        .map(|d| d.as_bytes())
-    {
-        if !d.contains(&four_a) || !d.contains(&four_b) {
-            zero_chars = make_map(d);
-        } else if d.contains(&one_a) && d.contains(&one_b) {
+    for d in data.signals[6..9].iter().map(|d| d.as_bytes()) {
+        let chars: [u8; 6] = d.try_into().unwrap();
+        if !chars.contains(&four_a) || !chars.contains(&four_b) {
+            // The 0 char.
+            zero_chars = chars;
+        } else if chars.contains(&one_a) && chars.contains(&one_b) {
             // The 9 char.
-            nine_chars = make_map(d);
+            nine_chars = chars;
         } else {
             // The 6 char.
-            six_chars = make_map(d);
+            six_chars = chars;
         }
     }
 
     // We can find out which one G is by filtering out all known characters from
     // nine_chars.
-    let g_seg = (|| {
+    let g_seg = {
         let known_segments = [one_a, one_b, four_a, four_b, a_seg];
+        let mut seg = 0;
         for nc in nine_chars {
             if !known_segments.contains(&nc) {
-                return nc;
+                seg = nc;
             }
         }
-        panic!("bad nine-char");
-    })();
+        seg
+    };
 
     // We know where G is, add it to the known segments and filter the 6 character
     // for the E segment.
-    let e_seg = (|| {
+    let e_seg = {
         let known_segments = [one_a, one_b, four_a, four_b, a_seg, g_seg];
+        let mut seg = 0;
         for nc in six_chars {
             if !known_segments.contains(&nc) {
-                return nc;
+                seg = nc;
             }
         }
-        panic!("bad six-char");
-    })();
+        seg
+    };
 
     // We've now fixed the A, E, and G segments.
     // We can fix the B and D segments by looking at which one in the zero_char
