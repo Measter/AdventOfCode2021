@@ -1,11 +1,17 @@
-use aoc_lib::{day, Bench, BenchResult, NoError, UserError};
-use color_eyre::eyre::{eyre, Context, Result};
+use aoc_lib::{Bench, BenchResult, Day, NoError, ParseResult, UserError};
+use color_eyre::{
+    eyre::{eyre, Context, Result},
+    Report,
+};
 
-day! {
-   day 4: "Giant Squid"
-   1: run_part1
-   2: run_part2
-}
+pub const DAY: Day = Day {
+    day: 4,
+    name: "Giant Squid",
+    part_1: run_part1,
+    part_2: Some(run_part2),
+    parse: Some(run_parse),
+    other: Vec::new(),
+};
 
 fn run_part1(input: &str, b: Bench) -> BenchResult {
     let (numbers, boards) = parse(input).map_err(UserError)?;
@@ -15,6 +21,13 @@ fn run_part1(input: &str, b: Bench) -> BenchResult {
 fn run_part2(input: &str, b: Bench) -> BenchResult {
     let (numbers, boards) = parse(input).map_err(UserError)?;
     b.bench(|| Ok::<_, NoError>(part2(&numbers, boards.clone())))
+}
+
+fn run_parse(input: &str, b: Bench) -> BenchResult {
+    b.bench(|| {
+        let game_data = parse(input)?;
+        Ok::<_, Report>(ParseResult(game_data))
+    })
 }
 
 #[derive(Clone)]

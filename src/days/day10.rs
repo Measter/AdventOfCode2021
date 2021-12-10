@@ -1,14 +1,18 @@
-use aoc_lib::{day, Bench, BenchResult, NoError};
+use aoc_lib::{Bench, BenchResult, Day, NoError, ParseResult};
+use color_eyre::Report;
 
 // 7:36
 // 8:13
 // 8:32
 
-day! {
-   day 10: "Syntax Scoring"
-   1: run_part1
-   2: run_part2
-}
+pub const DAY: Day = Day {
+    day: 10,
+    name: "Syntax Scoring",
+    part_1: run_part1,
+    part_2: Some(run_part2),
+    parse: Some(run_parse),
+    other: Vec::new(),
+};
 
 fn run_part1(input: &str, b: Bench) -> BenchResult {
     let lines: Vec<_> = input.lines().collect();
@@ -18,6 +22,13 @@ fn run_part1(input: &str, b: Bench) -> BenchResult {
 fn run_part2(input: &str, b: Bench) -> BenchResult {
     let lines: Vec<_> = input.lines().collect();
     b.bench(|| Ok::<_, NoError>(part2(&lines)))
+}
+
+fn run_parse(input: &str, b: Bench) -> BenchResult {
+    b.bench(|| {
+        let lines: Vec<_> = input.lines().collect();
+        Ok::<_, Report>(ParseResult(lines))
+    })
 }
 
 fn bracket_score(byte: u8) -> u64 {
@@ -96,7 +107,7 @@ fn part2(input: &[&str]) -> u64 {
         }
 
         let mut score = 0;
-        while let Some(open) = stack.pop() {
+        for &open in stack.iter().rev() {
             score *= 5;
             score += bracket_score(open);
         }

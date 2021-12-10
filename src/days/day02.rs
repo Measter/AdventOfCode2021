@@ -1,32 +1,33 @@
-use aoc_lib::{day, Bench, BenchResult, NoError, UserError};
-use color_eyre::eyre::{eyre, Result};
+use aoc_lib::{Bench, BenchResult, Day, NoError, ParseResult, UserError};
+use color_eyre::{
+    eyre::{eyre, Result},
+    Report,
+};
 
-day! {
-   day 2: "Dive!"
-   1: run_part1
-   2: run_part2
-}
+pub const DAY: Day = Day {
+    day: 2,
+    name: "Dive!",
+    part_1: run_part1,
+    part_2: Some(run_part2),
+    parse: Some(run_parse),
+    other: Vec::new(),
+};
 
 fn run_part1(input: &str, b: Bench) -> BenchResult {
-    let instrs: Vec<_> = input
-        .lines()
-        .map(str::trim)
-        .map(Instruction::parse)
-        .collect::<Result<_, _>>()
-        .map_err(UserError)?;
-
+    let instrs = parse(input).map_err(UserError)?;
     b.bench(|| Ok::<_, NoError>(part1(&instrs)))
 }
 
 fn run_part2(input: &str, b: Bench) -> BenchResult {
-    let instrs: Vec<_> = input
-        .lines()
-        .map(str::trim)
-        .map(Instruction::parse)
-        .collect::<Result<_, _>>()
-        .map_err(UserError)?;
-
+    let instrs = parse(input).map_err(UserError)?;
     b.bench(|| Ok::<_, NoError>(part2(&instrs)))
+}
+
+fn run_parse(input: &str, b: Bench) -> BenchResult {
+    b.bench(|| {
+        let instrs = parse(input)?;
+        Ok::<_, Report>(ParseResult(instrs))
+    })
 }
 
 #[derive(Clone, Copy)]
@@ -45,6 +46,16 @@ impl Instruction {
             _ => Err(eyre!("invalid instruction: {}", line)),
         }
     }
+}
+
+fn parse(input: &str) -> Result<Vec<Instruction>> {
+    let instrs: Vec<_> = input
+        .lines()
+        .map(str::trim)
+        .map(Instruction::parse)
+        .collect::<Result<_, _>>()?;
+
+    Ok(instrs)
 }
 
 fn part1(instrs: &[Instruction]) -> u32 {

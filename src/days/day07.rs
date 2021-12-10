@@ -1,31 +1,41 @@
-use aoc_lib::{day, Bench, BenchResult, UserError};
+use aoc_lib::{Bench, BenchResult, Day, ParseResult, UserError};
+use color_eyre::{Report, Result};
 
-day! {
-   day 7: "The Treachery of Whales"
-   1: run_part1
-   2: run_part2
-}
+pub const DAY: Day = Day {
+    day: 7,
+    name: "The Treachery of Whales",
+    part_1: run_part1,
+    part_2: Some(run_part2),
+    parse: Some(run_parse),
+    other: Vec::new(),
+};
 
 fn run_part1(input: &str, b: Bench) -> BenchResult {
-    let crabs: Vec<_> = input
-        .split_terminator(',')
-        .map(str::trim)
-        .map(str::parse::<u32>)
-        .collect::<Result<_, _>>()
-        .map_err(UserError)?;
-
+    let crabs: Vec<_> = parse(input).map_err(UserError)?;
     b.bench(|| find_fuel(&crabs, part1_fuel))
 }
 
 fn run_part2(input: &str, b: Bench) -> BenchResult {
+    let crabs: Vec<_> = parse(input).map_err(UserError)?;
+
+    b.bench(|| find_fuel(&crabs, part2_fuel))
+}
+
+fn run_parse(input: &str, b: Bench) -> BenchResult {
+    b.bench(|| {
+        let crabs = parse(input)?;
+        Ok::<_, Report>(ParseResult(crabs))
+    })
+}
+
+fn parse(input: &str) -> Result<Vec<u32>> {
     let crabs: Vec<_> = input
         .split_terminator(',')
         .map(str::trim)
         .map(str::parse::<u32>)
-        .collect::<Result<_, _>>()
-        .map_err(UserError)?;
+        .collect::<Result<_, _>>()?;
 
-    b.bench(|| find_fuel(&crabs, part2_fuel))
+    Ok(crabs)
 }
 
 fn part1_fuel(n: u32) -> u32 {

@@ -1,34 +1,45 @@
 use std::cmp::Ordering;
 
-use aoc_lib::{day, Bench, BenchResult, NoError};
-use color_eyre::eyre::{eyre, Result};
+use aoc_lib::{Bench, BenchResult, Day, NoError, ParseResult, UserError};
+use color_eyre::{
+    eyre::{eyre, Result},
+    Report,
+};
 
-day! {
-   day 5: "Hydrothermal Venture"
-   1: run_part1
-   2: run_part2
-}
+pub const DAY: Day = Day {
+    day: 5,
+    name: "Hydrothermal Venture",
+    part_1: run_part1,
+    part_2: Some(run_part2),
+    parse: Some(run_parse),
+    other: Vec::new(),
+};
 
 fn run_part1(input: &str, b: Bench) -> BenchResult {
-    let lines: Vec<_> = input
-        .lines()
-        .map(str::trim)
-        .map(Line::parse)
-        .collect::<Result<_, _>>()
-        .unwrap();
-
+    let lines = parse(input).map_err(UserError)?;
     b.bench(|| Ok::<_, NoError>(part1(&lines)))
 }
 
 fn run_part2(input: &str, b: Bench) -> BenchResult {
+    let lines = parse(input).map_err(UserError)?;
+    b.bench(|| Ok::<_, NoError>(part2(&lines)))
+}
+
+fn run_parse(input: &str, b: Bench) -> BenchResult {
+    b.bench(|| {
+        let lines = parse(input)?;
+        Ok::<_, Report>(ParseResult(lines))
+    })
+}
+
+fn parse(input: &str) -> Result<Vec<Line>> {
     let lines: Vec<_> = input
         .lines()
         .map(str::trim)
         .map(Line::parse)
-        .collect::<Result<_, _>>()
-        .unwrap();
+        .collect::<Result<_, _>>()?;
 
-    b.bench(|| Ok::<_, NoError>(part2(&lines)))
+    Ok(lines)
 }
 
 #[derive(Debug, Clone, Copy)]

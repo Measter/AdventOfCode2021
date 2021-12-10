@@ -1,12 +1,18 @@
-use aoc_lib::{day, Bench, BenchResult, NoError, UserError};
-use color_eyre::eyre::{eyre, Result};
+use aoc_lib::{Bench, BenchResult, Day, NoError, ParseResult, UserError};
+use color_eyre::{
+    eyre::{eyre, Result},
+    Report,
+};
 use nom::AsBytes;
 
-day! {
-   day 8: "Seven Segment Search"
-   1: run_part1
-   2: run_part2
-}
+pub const DAY: Day = Day {
+    day: 8,
+    name: "Seven Segment Search",
+    part_1: run_part1,
+    part_2: Some(run_part2),
+    parse: Some(run_parse),
+    other: Vec::new(),
+};
 
 fn run_part1(input: &str, b: Bench) -> BenchResult {
     let data: Vec<_> = input
@@ -20,14 +26,26 @@ fn run_part1(input: &str, b: Bench) -> BenchResult {
 }
 
 fn run_part2(input: &str, b: Bench) -> BenchResult {
+    let data: Vec<_> = parse(input).map_err(UserError)?;
+
+    b.bench(|| Ok::<_, NoError>(part2(&data)))
+}
+
+fn run_parse(input: &str, b: Bench) -> BenchResult {
+    b.bench(|| {
+        let data = parse(input)?;
+        Ok::<_, Report>(ParseResult(data))
+    })
+}
+
+fn parse(input: &str) -> Result<Vec<Data>> {
     let data: Vec<_> = input
         .lines()
         .map(str::trim)
         .map(Data::parse)
-        .collect::<Result<_, _>>()
-        .map_err(UserError)?;
+        .collect::<Result<_, _>>()?;
 
-    b.bench(|| Ok::<_, NoError>(part2(&data)))
+    Ok(data)
 }
 
 #[derive(Debug, Clone, Copy)]

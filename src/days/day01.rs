@@ -1,31 +1,41 @@
-use aoc_lib::{day, misc::ArrWindows, Bench, BenchResult, NoError, UserError};
+use aoc_lib::{misc::ArrWindows, Bench, BenchResult, Day, NoError, ParseResult, UserError};
+use color_eyre::{eyre::Result, Report};
 
-day! {
-   day 1: "Sonar Sweep"
-   1: run_part1
-   2: run_part2
-}
+pub const DAY: Day = Day {
+    day: 1,
+    name: "Sonar Sweep",
+    part_1: run_part1,
+    part_2: Some(run_part2),
+    parse: Some(run_parse),
+    other: Vec::new(),
+};
 
 fn run_part1(input: &str, b: Bench) -> BenchResult {
-    let depths: Vec<_> = input
-        .lines()
-        .map(str::trim)
-        .map(str::parse)
-        .collect::<Result<_, _>>()
-        .map_err(UserError)?;
+    let depths = parse(input).map_err(UserError)?;
 
     b.bench(|| Ok::<_, NoError>(part1(&depths)))
 }
 
 fn run_part2(input: &str, b: Bench) -> BenchResult {
+    let depths = parse(input).map_err(UserError)?;
+    b.bench(|| Ok::<_, NoError>(part2(&depths)))
+}
+
+fn run_parse(input: &str, b: Bench) -> BenchResult {
+    b.bench(|| {
+        let depths = parse(input)?;
+        Ok::<_, Report>(ParseResult(depths))
+    })
+}
+
+fn parse(input: &str) -> Result<Vec<u32>> {
     let depths: Vec<_> = input
         .lines()
         .map(str::trim)
         .map(str::parse)
-        .collect::<Result<_, _>>()
-        .map_err(UserError)?;
+        .collect::<Result<_, _>>()?;
 
-    b.bench(|| Ok::<_, NoError>(part2(&depths)))
+    Ok(depths)
 }
 
 fn part1(depths: &[u32]) -> usize {

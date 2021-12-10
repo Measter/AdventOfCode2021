@@ -1,29 +1,39 @@
-use aoc_lib::{day, Bench, BenchResult, NoError};
+use aoc_lib::{Bench, BenchResult, Day, NoError, ParseResult, UserError};
+use color_eyre::{Report, Result};
 
-day! {
-   day 3: "Binary Diagnostics"
-   1: run_part1
-   2: run_part2
-}
+pub const DAY: Day = Day {
+    day: 3,
+    name: "Binary Diagnostics",
+    part_1: run_part1,
+    part_2: Some(run_part2),
+    parse: Some(run_parse),
+    other: Vec::new(),
+};
 
 fn run_part1(input: &str, b: Bench) -> BenchResult {
-    let nums: Vec<_> = input
-        .lines()
-        .map(|l| u32::from_str_radix(l, 2))
-        .collect::<Result<_, _>>()
-        .unwrap();
-
+    let nums: Vec<_> = parse(input).map_err(UserError)?;
     b.bench(|| Ok::<_, NoError>(part1::<12>(&nums)))
 }
 
 fn run_part2(input: &str, b: Bench) -> BenchResult {
+    let nums: Vec<_> = parse(input).map_err(UserError)?;
+    b.bench(|| Ok::<_, NoError>(part2::<12>(&nums)))
+}
+
+fn run_parse(input: &str, b: Bench) -> BenchResult {
+    b.bench(|| {
+        let nums = parse(input)?;
+        Ok::<_, Report>(ParseResult(nums))
+    })
+}
+
+fn parse(input: &str) -> Result<Vec<u32>> {
     let nums: Vec<_> = input
         .lines()
         .map(|l| u32::from_str_radix(l, 2))
-        .collect::<Result<_, _>>()
-        .unwrap();
+        .collect::<Result<_, _>>()?;
 
-    b.bench(|| Ok::<_, NoError>(part2::<12>(&nums)))
+    Ok(nums)
 }
 
 fn part1<const N: usize>(nums: &[u32]) -> u32 {

@@ -1,10 +1,14 @@
-use aoc_lib::{day, Bench, BenchResult, NoError};
+use aoc_lib::{Bench, BenchResult, Day, NoError, ParseResult};
+use color_eyre::Report;
 
-day! {
-   day 9: "Smoke Basin"
-   1: run_part1
-   2: run_part2
-}
+pub const DAY: Day = Day {
+    day: 9,
+    name: "Smoke Basin",
+    part_1: run_part1,
+    part_2: Some(run_part2),
+    parse: Some(run_parse),
+    other: Vec::new(),
+};
 
 fn run_part1(input: &str, b: Bench) -> BenchResult {
     let map = Map::parse(input);
@@ -14,6 +18,13 @@ fn run_part1(input: &str, b: Bench) -> BenchResult {
 fn run_part2(input: &str, b: Bench) -> BenchResult {
     let map = Map::parse(input);
     b.bench(|| Ok::<_, NoError>(part2(&map)))
+}
+
+fn run_parse(input: &str, b: Bench) -> BenchResult {
+    b.bench(|| {
+        let map = Map::parse(input);
+        Ok::<_, Report>(ParseResult(map))
+    })
 }
 
 struct Map {
