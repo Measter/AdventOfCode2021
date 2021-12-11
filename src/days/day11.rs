@@ -1,8 +1,5 @@
 use aoc_lib::{Bench, BenchResult, Day, NoError, ParseResult, UserError};
-use color_eyre::{
-    eyre::{eyre, Result},
-    Report,
-};
+use color_eyre::{eyre::Result, Report};
 
 //8:18
 //9:23
@@ -62,7 +59,8 @@ struct Field {
     height: usize,
 }
 
-fn get_neighbours(idx: usize, width: usize, height: usize) -> [Option<usize>; 8] {
+#[inline(always)]
+fn add_neighbours(check_queue: &mut Vec<usize>, idx: usize, width: usize, height: usize) {
     let x = (idx % width) as isize;
     let y = (idx / width) as isize;
     let iwidth = width as isize;
@@ -74,21 +72,21 @@ fn get_neighbours(idx: usize, width: usize, height: usize) -> [Option<usize>; 8]
         (-1,  1), ( 0,  1), ( 1,  1)
     ];
 
-    rel.map(|(rx, ry)| {
+    for (rx, ry) in rel {
         let new_x = match (x, rx) {
-            (0, -1) => return None,
-            (_, 1) if x == iwidth - 1 => return None,
+            (0, -1) => continue,
+            (_, 1) if x == iwidth - 1 => continue,
             (x, rx) => (x + rx) as usize,
         };
 
         let new_y = match (y, ry) {
-            (0, -1) => return None,
-            (_, 1) if y == iheight - 1 => return None,
+            (0, -1) => continue,
+            (_, 1) if y == iheight - 1 => continue,
             (y, ry) => (y + ry) as usize,
         };
 
-        Some(new_y * width + new_x)
-    })
+        check_queue.push(new_y * width + new_x);
+    }
 }
 
 impl Field {
@@ -121,22 +119,18 @@ impl Field {
             }
 
             self.tiles[idx] |= 0x80; // Mark it as flashed.
-
-            let neighbours = get_neighbours(idx, self.width, self.height);
-            check_queue.extend(neighbours.into_iter().flatten());
+            add_neighbours(check_queue, idx, self.width, self.height);
 
             while let Some(nb) = check_queue.pop() {
-                let mut new_val = self.tiles[nb].saturating_add(1);
+                let nb_tile = unsafe { self.tiles.get_unchecked_mut(nb) };
+                *nb_tile += 1;
 
                 // If it's hit the trigger, but hasn't flashed.
-                if new_val >= 10 && new_val & 0x80 == 0 {
-                    let neighbours = get_neighbours(nb, self.width, self.height);
-                    check_queue.extend(neighbours.into_iter().flatten());
+                if *nb_tile >= 10 && *nb_tile & 0x80 == 0 {
+                    add_neighbours(check_queue, nb, self.width, self.height);
                     // Mark it as flashed;
-                    new_val |= 0x80;
+                    *nb_tile |= 0x80;
                 }
-
-                self.tiles[nb] = new_val;
             }
         }
 
@@ -151,6 +145,7 @@ impl Field {
         flashes
     }
 
+    #[allow(unused)]
     fn print_table(&self) {
         for row in self.tiles.chunks_exact(self.width) {
             for tile in row {
