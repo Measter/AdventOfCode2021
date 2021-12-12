@@ -1,8 +1,5 @@
-use std::collections::{HashMap, HashSet};
-
 use aoc_lib::{Bench, BenchResult, Day, NoError, ParseResult};
-use color_eyre::eyre::{eyre, Result};
-use lasso::{Interner, Rodeo, Spur};
+use lasso::{Key, Rodeo, Spur};
 
 // 8:42
 // 9:30
@@ -31,6 +28,7 @@ fn run_parse(input: &str, b: Bench) -> BenchResult {
     b.bench(|| Ok::<_, NoError>(ParseResult(CaveSystem::parse(input))))
 }
 
+#[derive(Default)]
 struct Cave {
     is_big: bool,
     leads_to: Vec<Spur>,
@@ -39,15 +37,23 @@ struct Cave {
 struct CaveSystem {
     entry: Spur,
     exit: Spur,
-    caves: HashMap<Spur, Cave>,
+    caves: Vec<Cave>,
     interner: Rodeo,
 }
 
 impl CaveSystem {
+    fn get_cave(caves: &mut Vec<Cave>, id: Spur) -> &mut Cave {
+        let idx = id.into_usize();
+        if idx >= caves.len() {
+            caves.resize_with(idx + 1, Default::default);
+        }
+        &mut caves[idx]
+    }
+
     fn parse(input: &str) -> CaveSystem {
         let mut entry = None;
         let mut exit = None;
-        let mut caves = HashMap::new();
+        let mut caves = Vec::new();
         let mut interner = Rodeo::new();
 
         for line in input.trim().lines() {
@@ -65,23 +71,13 @@ impl CaveSystem {
                 exit = Some(end_spur);
             }
 
-            caves
-                .entry(start_spur)
-                .or_insert_with(|| Cave {
-                    is_big: start.chars().all(|c| c.is_uppercase()),
-                    leads_to: Vec::new(),
-                })
-                .leads_to
-                .push(end_spur);
+            let start_cave = CaveSystem::get_cave(&mut caves, start_spur);
+            start_cave.is_big = start.chars().all(|c| c.is_uppercase());
+            start_cave.leads_to.push(end_spur);
 
-            caves
-                .entry(end_spur)
-                .or_insert_with(|| Cave {
-                    is_big: end.chars().all(|c| c.is_uppercase()),
-                    leads_to: Vec::new(),
-                })
-                .leads_to
-                .push(start_spur);
+            let end_cave = CaveSystem::get_cave(&mut caves, end_spur);
+            end_cave.is_big = end.chars().all(|c| c.is_uppercase());
+            end_cave.leads_to.push(start_spur);
         }
 
         CaveSystem {
@@ -92,60 +88,37 @@ impl CaveSystem {
         }
     }
 
-    fn print_path(&self, path: Vec<Spur>) {
-        match &*path {
-            [] => {}
-            [start] => {
-                println!("{}", self.interner.resolve(start));
-            }
-            [start, rest @ ..] => {
-                print!("{}", self.interner.resolve(start));
-                for node in rest {
-                    print!(", {}", self.interner.resolve(node));
-                }
-                println!();
-            }
-        }
-    }
-
-    fn traverse_paths_part1(
-        &self,
-        root: Spur,
-        mut path: Vec<Spur>,
-        mut visited: HashSet<Spur>,
-    ) -> usize {
-        path.push(root);
+    fn traverse_paths_part1(&self, root: Spur, visited: &[bool]) -> usize {
         if root == self.exit {
-            // self.print_path(path);
             return 1;
         }
-        let cave = &self.caves[&root];
-        if !cave.is_big && !visited.insert(root) {
-            return 0;
-        }
+        let cave = &self.caves[root.into_usize()];
+        let mut local_visited: Vec<bool>;
+        let visited_ref = if !cave.is_big {
+            if visited[root.into_usize()] {
+                return 0;
+            }
+            local_visited = visited.to_owned();
+            local_visited[root.into_usize()] = true;
+            &local_visited
+        } else {
+            visited
+        };
 
         let mut num_paths = 0;
         for &next_cave in &cave.leads_to {
-            num_paths += self.traverse_paths_part1(next_cave, path.clone(), visited.clone());
+            num_paths += self.traverse_paths_part1(next_cave, visited_ref);
         }
 
         num_paths
     }
 
-    fn traverse_paths_part2(
-        &self,
-        root: Spur,
-        mut path: Vec<Spur>,
-        mut visited_twice: bool,
-        mut visited: HashMap<Spur, u8>,
-    ) -> usize {
-        path.push(root);
+    fn traverse_paths_part2(&self, root: Spur, mut visited_twice: bool, visited: &[u8]) -> usize {
         if root == self.exit {
-            // self.print_path(path);
             return 1;
         }
-        let cave = &self.caves[&root];
-        let visit_count = *visited.get(&root).unwrap_or(&0);
+        let cave = &self.caves[root.into_usize()];
+        let visit_count = visited[root.into_usize()];
         if root == self.entry
             || (!cave.is_big && visited_twice && visit_count == 1)
             || (!cave.is_big && visit_count == 2)
@@ -153,18 +126,20 @@ impl CaveSystem {
             return 0;
         }
 
-        if !cave.is_big {
-            let count = visited.entry(root).or_insert(0);
+        let mut local_visited: Vec<u8>;
+        let visited_ref = if !cave.is_big {
+            local_visited = visited.to_owned();
+            let count = &mut local_visited[root.into_usize()];
             *count += 1;
-            if *count == 2 {
-                visited_twice = true;
-            }
-        }
+            visited_twice |= *count == 2;
+            &local_visited
+        } else {
+            visited
+        };
 
         let mut num_paths = 0;
         for &next_cave in &cave.leads_to {
-            num_paths +=
-                self.traverse_paths_part2(next_cave, path.clone(), visited_twice, visited.clone());
+            num_paths += self.traverse_paths_part2(next_cave, visited_twice, visited_ref);
         }
 
         num_paths
@@ -172,31 +147,28 @@ impl CaveSystem {
 }
 
 fn part1(cave_system: &CaveSystem) -> usize {
-    let mut visited = HashSet::new();
+    let entry_cave = &cave_system.caves[cave_system.entry.into_usize()];
 
-    let entry_cave = cave_system.caves.get(&cave_system.entry).unwrap();
-    visited.insert(cave_system.entry);
+    let mut visited = vec![false; cave_system.interner.len()];
+    visited[cave_system.entry.into_usize()] = true;
 
     let mut num_paths = 0;
-    let mut path = vec![cave_system.entry];
     for &next_cave in &entry_cave.leads_to {
-        num_paths += cave_system.traverse_paths_part1(next_cave, path.clone(), visited.clone());
+        num_paths += cave_system.traverse_paths_part1(next_cave, &visited);
     }
 
     num_paths
 }
 
 fn part2(cave_system: &CaveSystem) -> usize {
-    let mut visited = HashMap::new();
+    let entry_cave = &cave_system.caves[cave_system.entry.into_usize()];
 
-    let entry_cave = cave_system.caves.get(&cave_system.entry).unwrap();
-    visited.insert(cave_system.entry, 1);
+    let mut visited = vec![0; cave_system.interner.len() + 1];
+    visited[cave_system.entry.into_usize()] = 1;
 
     let mut num_paths = 0;
-    let mut path = vec![cave_system.entry];
     for &next_cave in &entry_cave.leads_to {
-        num_paths +=
-            cave_system.traverse_paths_part2(next_cave, path.clone(), false, visited.clone());
+        num_paths += cave_system.traverse_paths_part2(next_cave, false, &visited);
     }
 
     num_paths
