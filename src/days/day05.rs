@@ -134,8 +134,11 @@ fn part2(lines: &[Line]) -> usize {
 
         loop {
             let idx = y as usize * 1000 + x as usize;
-            let new_val = point_map[idx].saturating_add(1);
-            point_map[idx] = new_val;
+            let new_val = unsafe {
+                let v = point_map.get_unchecked_mut(idx);
+                *v = v.saturating_add(1);
+                *v
+            };
             high_points += (new_val == 2) as usize;
             if x == line.end.x && y == line.end.y {
                 break;
