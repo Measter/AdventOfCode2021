@@ -88,32 +88,37 @@ impl CaveSystem {
         }
     }
 
-    fn traverse_paths_part1(&self, root: Spur, visited: &[bool]) -> usize {
+    fn traverse_paths_part1(&self, root: Spur, visited: &mut [bool]) -> usize {
         if root == self.exit {
             return 1;
         }
         let cave = &self.caves[root.into_usize()];
-        let mut local_visited: Vec<bool>;
-        let visited_ref = if !cave.is_big {
+
+        if !cave.is_big {
             if visited[root.into_usize()] {
                 return 0;
             }
-            local_visited = visited.to_owned();
-            local_visited[root.into_usize()] = true;
-            &local_visited
-        } else {
-            visited
-        };
+            visited[root.into_usize()] = true;
+        }
 
         let mut num_paths = 0;
         for &next_cave in &cave.leads_to {
-            num_paths += self.traverse_paths_part1(next_cave, visited_ref);
+            num_paths += self.traverse_paths_part1(next_cave, visited);
+        }
+
+        if !cave.is_big {
+            visited[root.into_usize()] = false;
         }
 
         num_paths
     }
 
-    fn traverse_paths_part2(&self, root: Spur, mut visited_twice: bool, visited: &[u8]) -> usize {
+    fn traverse_paths_part2(
+        &self,
+        root: Spur,
+        mut visited_twice: bool,
+        visited: &mut [u16],
+    ) -> usize {
         if root == self.exit {
             return 1;
         }
@@ -123,20 +128,17 @@ impl CaveSystem {
             return 0;
         }
 
-        let mut local_visited: Vec<u8>;
-        let visited_ref = if !cave.is_big {
-            local_visited = visited.to_owned();
-            let count = &mut local_visited[root.into_usize()];
-            *count += 1;
-            visited_twice |= *count >= 2;
-            &local_visited
-        } else {
-            visited
-        };
-
+        if !cave.is_big {
+            visited[root.into_usize()] += 1;
+            visited_twice |= visited[root.into_usize()] >= 2;
+        }
         let mut num_paths = 0;
         for &next_cave in &cave.leads_to {
-            num_paths += self.traverse_paths_part2(next_cave, visited_twice, visited_ref);
+            num_paths += self.traverse_paths_part2(next_cave, visited_twice, visited);
+        }
+
+        if !cave.is_big {
+            visited[root.into_usize()] -= 1;
         }
 
         num_paths
@@ -151,7 +153,7 @@ fn part1(cave_system: &CaveSystem) -> usize {
 
     let mut num_paths = 0;
     for &next_cave in &entry_cave.leads_to {
-        num_paths += cave_system.traverse_paths_part1(next_cave, &visited);
+        num_paths += cave_system.traverse_paths_part1(next_cave, &mut visited);
     }
 
     num_paths
@@ -165,7 +167,7 @@ fn part2(cave_system: &CaveSystem) -> usize {
 
     let mut num_paths = 0;
     for &next_cave in &entry_cave.leads_to {
-        num_paths += cave_system.traverse_paths_part2(next_cave, false, &visited);
+        num_paths += cave_system.traverse_paths_part2(next_cave, false, &mut visited);
     }
 
     num_paths
