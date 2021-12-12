@@ -119,10 +119,7 @@ impl CaveSystem {
         }
         let cave = &self.caves[root.into_usize()];
         let visit_count = visited[root.into_usize()];
-        if root == self.entry
-            || (!cave.is_big && visited_twice && visit_count == 1)
-            || (!cave.is_big && visit_count == 2)
-        {
+        if root == self.entry || (!cave.is_big && visited_twice && visit_count >= 1) {
             return 0;
         }
 
@@ -131,7 +128,7 @@ impl CaveSystem {
             local_visited = visited.to_owned();
             let count = &mut local_visited[root.into_usize()];
             *count += 1;
-            visited_twice |= *count == 2;
+            visited_twice |= *count >= 2;
             &local_visited
         } else {
             visited
