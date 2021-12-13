@@ -12,7 +12,7 @@ pub const DAY: Day = Day {
     part_1: run_part1,
     part_2: Some(run_part2),
     parse: Some(run_parse),
-    other: Vec::new(),
+    other: &[],
 };
 
 fn run_part1(input: &str, b: Bench) -> BenchResult {
