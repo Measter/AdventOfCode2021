@@ -15,11 +15,11 @@ pub const DAY: Day = Day {
 };
 
 fn run_part1(input: &str, b: Bench) -> BenchResult {
-    let (paper, instrs) = PaperInstructions::parse(input);
+    let (paper, instrs) = PaperInstructionsPart1::parse(input);
     b.bench(|| {
         Ok::<_, NoError>({
             let mut paper = paper.clone();
-            paper.make_fold(instrs[0]);
+            paper.make_folds(&instrs[..1]);
 
             paper.count_dots()
         })
@@ -27,14 +27,12 @@ fn run_part1(input: &str, b: Bench) -> BenchResult {
 }
 
 fn run_part2(input: &str, b: Bench) -> BenchResult {
-    let (paper, instrs) = PaperInstructions::parse(input);
+    let (paper, instrs) = PaperInstructionsPart2::parse(input);
     b.bench_alt(|| {
         Ok::<_, NoError>({
             let mut paper = paper.clone();
 
-            for &instr in &instrs {
-                paper.make_fold(instr);
-            }
+            paper.make_folds(&instrs);
 
             paper.print_paper()
         })
@@ -42,7 +40,7 @@ fn run_part2(input: &str, b: Bench) -> BenchResult {
 }
 
 fn run_parse(input: &str, b: Bench) -> BenchResult {
-    b.bench(|| Ok::<_, NoError>(ParseResult(PaperInstructions::parse(input))))
+    b.bench(|| Ok::<_, NoError>(ParseResult(PaperInstructionsPart1::parse(input))))
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
@@ -99,18 +97,18 @@ impl Instruction {
 }
 
 #[derive(Debug, Clone)]
-struct PaperInstructions {
-    dot_field: HashSet<Point>,
-    buffer: HashSet<Point>,
+struct PaperInstructionsPart1 {
+    points: Vec<Point>,
+    folded: HashSet<Point>,
     folded_width: usize,
     folded_height: usize,
 }
 
-impl PaperInstructions {
+impl PaperInstructionsPart1 {
     fn parse(input: &str) -> (Self, Vec<Instruction>) {
         let (point_str, instr_str) = input.split_once("\n\n").expect("Segment break not found");
 
-        let points: HashSet<_> = point_str.trim().lines().map(Point::parse).collect();
+        let points: Vec<_> = point_str.trim().lines().map(Point::parse).collect();
         let (width, height) = points
             .iter()
             .fold((0, 0), |(x, y), p| (x.max(p.x + 1), y.max(p.y + 1)));
@@ -119,8 +117,8 @@ impl PaperInstructions {
 
         (
             Self {
-                dot_field: points,
-                buffer: HashSet::new(),
+                points,
+                folded: HashSet::new(),
                 folded_height: height,
                 folded_width: width,
             },
@@ -128,12 +126,13 @@ impl PaperInstructions {
         )
     }
 
+    #[allow(unused)]
     fn print_paper(&self) -> String {
         let mut output = String::new();
 
         for y in 0..self.folded_height {
             for x in 0..self.folded_width {
-                if self.dot_field.contains(&Point { x, y }) {
+                if self.folded.contains(&Point { x, y }) {
                     output.push('#');
                 } else {
                     output.push(' ');
@@ -145,23 +144,100 @@ impl PaperInstructions {
         output
     }
 
-    fn make_fold(&mut self, instruction: Instruction) {
-        self.buffer.clear();
-        for point in self.dot_field.drain() {
-            let mirrored = point.reflect(instruction);
-            self.buffer.insert(mirrored);
+    fn make_folds(&mut self, instructions: &[Instruction]) {
+        for point in &self.points {
+            let new_point = instructions
+                .iter()
+                .fold(*point, |p, instr| p.reflect(*instr));
+            self.folded.insert(new_point);
         }
 
-        match instruction {
-            Instruction::Y(y) => self.folded_height = y,
-            Instruction::X(x) => self.folded_width = x,
-        }
+        let (folded_width, folded_height) = instructions.iter().fold(
+            (self.folded_width, self.folded_height),
+            |(width, height), instr| match *instr {
+                Instruction::Y(y) => (width, y),
+                Instruction::X(x) => (x, height),
+            },
+        );
 
-        std::mem::swap(&mut self.buffer, &mut self.dot_field);
+        self.folded_width = folded_width;
+        self.folded_height = folded_height;
     }
 
     fn count_dots(&self) -> usize {
-        self.dot_field.len()
+        self.folded.len()
+    }
+}
+
+#[derive(Debug, Clone)]
+struct PaperInstructionsPart2 {
+    points: Vec<Point>,
+    folded: Vec<bool>,
+    width: usize,
+    height: usize,
+}
+
+impl PaperInstructionsPart2 {
+    fn parse(input: &str) -> (Self, Vec<Instruction>) {
+        let (point_str, instr_str) = input.split_once("\n\n").expect("Segment break not found");
+        let points: Vec<_> = point_str.trim().lines().map(Point::parse).collect();
+        let instrs = instr_str.trim().lines().map(Instruction::parse).collect();
+
+        let (width, height) = points
+            .iter()
+            .fold((0, 0), |(x, y), p| (x.max(p.x + 1), y.max(p.y + 1)));
+
+        (
+            Self {
+                points,
+                folded: Vec::new(),
+                width,
+                height,
+            },
+            instrs,
+        )
+    }
+
+    fn print_paper(&self) -> String {
+        let mut output = String::new();
+
+        for row in self.folded.chunks_exact(self.width) {
+            for &p in row {
+                output.push(if p { '#' } else { ' ' });
+            }
+            output.push('\n');
+        }
+
+        output
+    }
+
+    fn make_folds(&mut self, instructions: &[Instruction]) {
+        let (folded_width, folded_height) =
+            instructions
+                .iter()
+                .fold(
+                    (self.width, self.height),
+                    |(width, height), instr| match *instr {
+                        Instruction::Y(y) => (width, y),
+                        Instruction::X(x) => (x, height),
+                    },
+                );
+
+        self.folded.resize(folded_width * folded_height, false);
+        self.width = folded_width;
+        self.height = folded_height;
+
+        for &point in &self.points {
+            let new_point = instructions
+                .iter()
+                .fold(point, |p, instr| p.reflect(*instr));
+            self.folded[new_point.y * folded_width + new_point.x] = true;
+        }
+    }
+
+    #[allow(unused)]
+    fn count_dots(&self) -> usize {
+        self.folded.iter().filter(|p| **p).count()
     }
 }
 
@@ -177,13 +253,34 @@ mod tests_template {
             .open()
             .unwrap();
 
-        let (mut paper, instrs) = PaperInstructions::parse(&input);
+        let (mut paper, instrs) = PaperInstructionsPart1::parse(&input);
+        let mut p1_paper = paper.clone();
 
-        paper.make_fold(instrs[0]);
+        p1_paper.make_folds(&instrs[..1]);
+        println!("{}", p1_paper.print_paper());
+        assert_eq!(17, p1_paper.count_dots());
+
+        paper.make_folds(&instrs);
         println!("{}", paper.print_paper());
-        assert_eq!(17, paper.count_dots());
+        assert_eq!(16, paper.count_dots());
+    }
 
-        paper.make_fold(instrs[1]);
+    #[test]
+    fn part2_test() {
+        let input = aoc_lib::input(13)
+            .example(Example::Part1, 1)
+            .open()
+            .unwrap();
+
+        let (mut paper, instrs) = PaperInstructionsPart2::parse(&input);
+
+        let mut p1_paper = paper.clone();
+
+        p1_paper.make_folds(&instrs[..1]);
+        println!("{}", p1_paper.print_paper());
+        assert_eq!(17, p1_paper.count_dots());
+
+        paper.make_folds(&instrs);
         println!("{}", paper.print_paper());
         assert_eq!(16, paper.count_dots());
     }
