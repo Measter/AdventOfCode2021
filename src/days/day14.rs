@@ -28,7 +28,7 @@ fn run_parse(input: &str, b: Bench) -> BenchResult {
 
 fn get_idx(pair: [u8; 2]) -> usize {
     let pair = pair.map(|b| b as usize);
-    pair[0] * 27 + pair[1]
+    pair[0] * 32 + pair[1]
 }
 
 const NO_RULE: u8 = 255;
@@ -36,7 +36,7 @@ const NO_RULE: u8 = 255;
 fn parse(input: &str) -> (Vec<u8>, Vec<u8>) {
     let (template, rest) = input.trim().split_once('\n').expect("bad input");
 
-    let mut rules_lookup = vec![NO_RULE; 27 * 27];
+    let mut rules_lookup = vec![NO_RULE; 32 * 32];
     for line in rest.trim().lines() {
         let (pattern, insertion) = line.trim().split_once(" -> ").expect("bad input");
         assert!(insertion.len() == 1);
@@ -51,7 +51,7 @@ fn parse(input: &str) -> (Vec<u8>, Vec<u8>) {
 }
 
 fn run_replace<const N: usize>(template: &[u8], rules: &[u8]) -> usize {
-    let mut pairs = vec![0_usize; 27 * 27];
+    let mut pairs = vec![0_usize; 32 * 32];
 
     for &pair in ArrWindows::new(template) {
         let idx = get_idx(pair);
@@ -60,7 +60,7 @@ fn run_replace<const N: usize>(template: &[u8], rules: &[u8]) -> usize {
 
     pairs[get_idx([template[template.len() - 1], 26])] += 1;
 
-    let mut dst = vec![0_usize; 27 * 27];
+    let mut dst = vec![0_usize; 32 * 32];
 
     for _ in 0..N {
         dst.fill(0);
@@ -68,24 +68,26 @@ fn run_replace<const N: usize>(template: &[u8], rules: &[u8]) -> usize {
             if count == 0 {
                 continue;
             }
-            let (a, b) = (pair / 27, pair % 27);
-            let replace = rules[pair];
+            let (a, b) = (pair / 32, pair % 32);
+            let replace = unsafe { *rules.get_unchecked(pair) };
             if replace != NO_RULE {
                 let a_idx = get_idx([a as u8, replace]);
                 let b_idx = get_idx([replace, b as u8]);
-                dst[a_idx] += count;
-                dst[b_idx] += count;
+                unsafe {
+                    *dst.get_unchecked_mut(a_idx) += count;
+                    *dst.get_unchecked_mut(b_idx) += count;
+                }
             } else {
-                dst[pair] = count;
+                unsafe { *dst.get_unchecked_mut(pair) = count };
             }
         }
 
         std::mem::swap(&mut pairs, &mut dst);
     }
 
-    let mut counts = [0_usize; 27];
+    let mut counts = [0_usize; 32];
     for (pair, count) in pairs.into_iter().enumerate() {
-        counts[pair / 27] += count;
+        counts[pair / 32] += count;
     }
 
     let (min, max) = counts.into_iter().fold((usize::MAX, 0), |(min, max), b| {
