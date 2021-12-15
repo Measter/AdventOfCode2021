@@ -1,7 +1,6 @@
-use std::cmp::Reverse;
+use std::collections::BinaryHeap;
 
 use aoc_lib::{Bench, BenchResult, Day, NoError, ParseResult};
-use priority_queue::PriorityQueue;
 
 // 12:03
 // 12:53
@@ -77,15 +76,14 @@ impl Map {
             let idx = point.y as usize * self.width + point.x as usize;
             self.tiles[idx] as u64
         } else {
-            let real_y = point.y as usize % self.height;
-            let real_x = point.x as usize % self.width;
-
-            let y_tile = (point.y as usize / self.height) as u64;
-            let x_tile = (point.x as usize / self.width) as u64;
+            let py = point.y as usize;
+            let px = point.x as usize;
+            let (real_y, y_tile) = (py % self.height, py / self.height);
+            let (real_x, x_tile) = (px % self.height, px / self.height);
 
             let hazard = self.tiles[real_y * self.width + real_x] as u64;
 
-            ((hazard - 1) + y_tile + x_tile) % 9 + 1
+            ((hazard - 1) + y_tile as u64 + x_tile as u64) % 9 + 1
         }
     }
 }
@@ -125,9 +123,34 @@ impl Point {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq)]
+struct State {
+    heuristic_cost: u64,
+    cost: u64,
+    pos: Point,
+}
+
+impl PartialEq for State {
+    fn eq(&self, other: &Self) -> bool {
+        self.heuristic_cost == other.heuristic_cost
+    }
+}
+
+impl Ord for State {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        other.heuristic_cost.cmp(&self.heuristic_cost)
+    }
+}
+
+impl PartialOrd for State {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 fn path_search<const ISP2: bool>(map: &Map) -> u64 {
     let origin = Point::new(0, 0);
-    let mut queue = PriorityQueue::new();
+    let mut queue = BinaryHeap::new();
 
     let (width, height) = if ISP2 {
         (map.p2_width, map.p2_height)
@@ -140,36 +163,34 @@ fn path_search<const ISP2: bool>(map: &Map) -> u64 {
     let mut prev = vec![Point::INVALID; width * height];
 
     dist[origin.to_idx(width)] = 0;
-    queue.push(origin, Reverse(0));
+    queue.push(State {
+        cost: 0,
+        heuristic_cost: 0,
+        pos: origin,
+    });
 
-    'outer: while let Some((point, Reverse(cost))) = queue.pop() {
-        for neighbour in point.neighbours() {
+    while let Some(next) = queue.pop() {
+        for neighbour in next.pos.neighbours() {
             if !map.contains::<ISP2>(neighbour) {
                 continue;
             }
-            let total_cost = cost + map.get_cost::<ISP2>(neighbour);
+            let total_cost = next.cost + map.get_cost::<ISP2>(neighbour);
+            if neighbour == target {
+                return total_cost;
+            }
             if total_cost < dist[neighbour.to_idx(width)] {
                 dist[neighbour.to_idx(width)] = total_cost;
-                prev[neighbour.to_idx(width)] = point;
-                queue.push_increase(
-                    neighbour,
-                    Reverse(total_cost + neighbour.estimate_cost(target)),
-                );
-            }
-            if neighbour == target {
-                break 'outer;
+                prev[neighbour.to_idx(width)] = next.pos;
+                queue.push(State {
+                    heuristic_cost: total_cost + neighbour.estimate_cost(target),
+                    cost: total_cost,
+                    pos: neighbour,
+                });
             }
         }
     }
 
-    let mut total_cost = 0;
-    let mut cur_point = target;
-    while cur_point != origin {
-        total_cost += map.get_cost::<ISP2>(cur_point);
-        cur_point = prev[cur_point.to_idx(width)];
-    }
-
-    total_cost
+    panic!("path not found");
 }
 
 #[cfg(test)]
