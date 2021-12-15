@@ -12,3 +12,4 @@ itertools = "0.10.1"
 lasso = { version = "0.6.0", features = ["inline-more"] }
 maplit = "1.0.2"
 nom = "7.1.0"
+priority-queue = "1.2.1"
