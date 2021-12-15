@@ -63,35 +63,35 @@ impl Map {
 
     fn contains<const ISP2: bool>(&self, point: Point) -> bool {
         let (x_range, y_range) = if ISP2 {
-            (0..self.p2_width as isize, 0..self.p2_height as isize)
+            (0..self.p2_width as i16, 0..self.p2_height as i16)
         } else {
-            (0..self.width as isize, 0..self.height as isize)
+            (0..self.width as i16, 0..self.height as i16)
         };
 
         x_range.contains(&point.x) && y_range.contains(&point.y)
     }
 
-    fn get_cost<const ISP2: bool>(&self, point: Point) -> u64 {
+    fn get_cost<const ISP2: bool>(&self, point: Point) -> u16 {
         if !ISP2 {
             let idx = point.y as usize * self.width + point.x as usize;
-            self.tiles[idx] as u64
+            self.tiles[idx] as u16
         } else {
             let py = point.y as usize;
             let px = point.x as usize;
             let (real_y, y_tile) = (py % self.height, py / self.height);
             let (real_x, x_tile) = (px % self.height, px / self.height);
 
-            let hazard = self.tiles[real_y * self.width + real_x] as u64;
+            let hazard = self.tiles[real_y * self.width + real_x] as u16;
 
-            ((hazard - 1) + y_tile as u64 + x_tile as u64) % 9 + 1
+            ((hazard - 1) + y_tile as u16 + x_tile as u16) % 9 + 1
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Point {
-    x: isize,
-    y: isize,
+    x: i16,
+    y: i16,
 }
 
 impl Point {
@@ -99,8 +99,8 @@ impl Point {
 
     fn new(x: usize, y: usize) -> Self {
         Self {
-            x: x as isize,
-            y: y as isize,
+            x: x as i16,
+            y: y as i16,
         }
     }
 
@@ -118,15 +118,15 @@ impl Point {
         self.y as usize * width + self.x as usize
     }
 
-    fn estimate_cost(self, target: Self) -> u64 {
-        ((target.x - self.x).abs() + (target.y - self.y).abs()) as u64
+    fn estimate_cost(self, target: Self) -> u16 {
+        ((target.x - self.x).abs() + (target.y - self.y).abs()) as u16
     }
 }
 
 #[derive(Debug, Clone, Copy, Eq)]
 struct State {
-    heuristic_cost: u64,
-    cost: u64,
+    heuristic_cost: u16,
+    cost: u16,
     pos: Point,
 }
 
@@ -148,7 +148,7 @@ impl PartialOrd for State {
     }
 }
 
-fn path_search<const ISP2: bool>(map: &Map) -> u64 {
+fn path_search<const ISP2: bool>(map: &Map) -> u16 {
     let origin = Point::new(0, 0);
     let mut queue = BinaryHeap::new();
 
@@ -159,7 +159,7 @@ fn path_search<const ISP2: bool>(map: &Map) -> u64 {
     };
 
     let target = Point::new(width - 1, height - 1);
-    let mut dist = vec![u64::MAX; width * height];
+    let mut dist = vec![u16::MAX; width * height];
     let mut prev = vec![Point::INVALID; width * height];
 
     dist[origin.to_idx(width)] = 0;
