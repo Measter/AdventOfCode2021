@@ -119,6 +119,10 @@ impl Point {
     fn to_idx(self, width: usize) -> usize {
         self.y as usize * width + self.x as usize
     }
+
+    fn estimate_cost(self, target: Self) -> u64 {
+        ((target.x - self.x).abs() + (target.y - self.y).abs()) as u64
+    }
 }
 
 fn path_search<const ISP2: bool>(map: &Map) -> u64 {
@@ -143,13 +147,15 @@ fn path_search<const ISP2: bool>(map: &Map) -> u64 {
             if !map.contains::<ISP2>(neighbour) {
                 continue;
             }
-            let total_cost = cost + map.get_cost::<ISP2>(point);
+            let total_cost = cost + map.get_cost::<ISP2>(neighbour);
             if total_cost < dist[neighbour.to_idx(width)] {
                 dist[neighbour.to_idx(width)] = total_cost;
                 prev[neighbour.to_idx(width)] = point;
-                queue.push_increase(neighbour, Reverse(total_cost));
+                queue.push_increase(
+                    neighbour,
+                    Reverse(total_cost + neighbour.estimate_cost(target)),
+                );
             }
-
             if neighbour == target {
                 break 'outer;
             }
