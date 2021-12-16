@@ -5,11 +5,19 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[profile.develop]
+inherits = "release"
+overflow-checks = true
+
+[profile.release]
+debug = true
+
 [dependencies]
-aoc_lib = { git = "https://github.com/Measter/aoc_lib" }
+# aoc_lib = { git = "https://github.com/Measter/aoc_lib" }
+aoc_lib = { path = "../aoc_lib" }
+bitreader = "0.3.4"
 color-eyre = "0.5.11"
 itertools = "0.10.1"
 lasso = { version = "0.6.0", features = ["inline-more"] }
 maplit = "1.0.2"
 nom = "7.1.0"
-priority-queue = "1.2.1"
