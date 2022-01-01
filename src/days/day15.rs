@@ -95,8 +95,6 @@ struct Point {
 }
 
 impl Point {
-    const INVALID: Point = Point { x: -1, y: -1 };
-
     fn new(x: usize, y: usize) -> Self {
         Self {
             x: x as i16,
@@ -160,7 +158,6 @@ fn path_search<const ISP2: bool>(map: &Map) -> u16 {
 
     let target = Point::new(width - 1, height - 1);
     let mut dist = vec![u16::MAX; width * height];
-    let mut prev = vec![Point::INVALID; width * height];
 
     dist[origin.to_idx(width)] = 0;
     queue.push(State {
@@ -180,7 +177,6 @@ fn path_search<const ISP2: bool>(map: &Map) -> u16 {
             }
             if total_cost < dist[neighbour.to_idx(width)] {
                 dist[neighbour.to_idx(width)] = total_cost;
-                prev[neighbour.to_idx(width)] = next.pos;
                 queue.push(State {
                     heuristic_cost: total_cost + neighbour.estimate_cost(target),
                     cost: total_cost,
