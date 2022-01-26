@@ -9,8 +9,7 @@ pub const DAY: Day = Day {
     name: "Dive!",
     part_1: run_part1,
     part_2: Some(run_part2),
-    parse: Some(run_parse),
-    other: &[],
+    other: &[("Parse", run_parse)],
 };
 
 fn run_part1(input: &str, b: Bench) -> BenchResult {
