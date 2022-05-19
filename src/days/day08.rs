@@ -3,7 +3,6 @@ use color_eyre::{
     eyre::{eyre, Result},
     Report,
 };
-use nom::AsBytes;
 
 pub const DAY: Day = Day {
     day: 8,
@@ -86,146 +85,102 @@ fn part1(data: &[Data]) -> u16 {
         .sum()
 }
 
-fn make_map(segments: &[u8]) -> [u8; 7] {
-    let mut map = [0; 7];
-    map[..segments.len()].copy_from_slice(segments);
-    map.sort_unstable();
-    map
+fn encode(signal: &str) -> u8 {
+    let bytes = signal.as_bytes();
+    let bytes = &bytes[..bytes.len().min(7)];
+
+    bytes.iter().map(|b| 1 << (b - b'a')).sum()
 }
 
-fn decode_signals(mut data: Data) -> u64 {
-    data.signals.sort_unstable_by_key(|s| s.len());
-    // dbg!(data.signals);
-    // panic!();
+fn decode_signals(data: Data) -> u64 {
+    let mut signals = data.signals.map(encode);
+    signals.sort_unstable_by_key(|s| s.count_ones());
 
     // Just look for the 1, 4, and 7 cases.
-    let one_chars: [u8; 2] = data.signals[0].as_bytes().try_into().unwrap();
-    let mut four_chars: [u8; 4] = data.signals[2].as_bytes().try_into().unwrap();
+    // The 1 case only has 2 bits set, which is the least of any.
+    let cf_wires = signals[0];
 
-    // We know that anything found in the one-chars can only be the C or F segments.
+    // We know that anything found in the one_wires can only be the C or F segments.
     // We'll filter them out from the four_chars and seven_chars.
-    for char in one_chars {
-        four_chars.iter_mut().for_each(|fc| {
-            if *fc == char {
-                *fc = 0
-            }
-        });
-    }
-    four_chars.sort_unstable();
-
-    // The one segment left for the seven_chars will fix where the A segment is.
-    // let [.., a_seg] = seven_chars;
-    let a_seg = {
-        let mut seg = 0;
-        for sc in data.signals[1].as_bytes() {
-            if !one_chars.contains(sc) {
-                seg = *sc;
-            }
-        }
-        seg
-    };
-
-    // After filtering, we know that what's left in four_chars must be the B and D
+    let bd_wires = signals[2] & !cf_wires;
+    // After filtering, we know that what's left in four_wires must be the B and D
     // segments.
 
-    // We can find the G segment by looking at the signals for the 9 character.
-    // It's the one with 6 lit segments, but only a single unknown.
-    let [one_a, one_b] = one_chars;
-    let [.., four_a, four_b] = four_chars;
-    let mut zero_chars = [0; 6];
-    let mut nine_chars = [0; 6];
-    let mut six_chars = [0; 6];
+    // The one segment left for the seven_wires will fix where the A segment is.
+    let a_seg = signals[1] & !cf_wires;
 
-    for d in data.signals[6..9].iter().map(|d| d.as_bytes()) {
-        let chars: [u8; 6] = d.try_into().unwrap();
-        if !chars.contains(&four_a) || !chars.contains(&four_b) {
+    // Now we can find out which is the 0, 6, and 9 digits by comparing the
+    // overlap with the 1, and 4 digits. Both 6 and 9 have both unknown wires
+    // in the 4-digits, while 0 only has one.
+    // Similarly, 9 contains both wires from the 1-digit, but 6 is missing one.
+    let mut zero_wires = 0;
+    let mut nine_wires = 0;
+    let mut six_wires = 0;
+
+    for &sig in &signals[6..9] {
+        if (sig & bd_wires).count_ones() == 1 {
             // The 0 char.
-            zero_chars = chars;
-        } else if chars.contains(&one_a) && chars.contains(&one_b) {
-            // The 9 char.
-            nine_chars = chars;
-        } else {
+            zero_wires = sig;
+        } else if (sig & cf_wires).count_ones() == 1 {
             // The 6 char.
-            six_chars = chars;
+            six_wires = sig;
+        } else {
+            // The 9 char.
+            nine_wires = sig;
         }
     }
 
-    // We can find out which one G is by filtering out all known characters from
-    // nine_chars.
-    let g_seg = {
-        let known_segments = [one_a, one_b, four_a, four_b, a_seg];
-        let mut seg = 0;
-        for nc in nine_chars {
-            if !known_segments.contains(&nc) {
-                seg = nc;
-            }
-        }
-        seg
-    };
+    // We can find out which wire is G by filtering out all known wires from
+    // nine_wires.
+    let g_seg = nine_wires & !(a_seg | cf_wires | bd_wires);
 
     // We know where G is, add it to the known segments and filter the 6 character
     // for the E segment.
-    let e_seg = {
-        let known_segments = [one_a, one_b, four_a, four_b, a_seg, g_seg];
-        let mut seg = 0;
-        for nc in six_chars {
-            if !known_segments.contains(&nc) {
-                seg = nc;
-            }
-        }
-        seg
-    };
+    let e_seg = six_wires & !(a_seg | g_seg | bd_wires | cf_wires);
 
     // We've now fixed the A, E, and G segments.
     // We can fix the B and D segments by looking at which one in the zero_char
     // *isn't* set.
-    let (b_seg, d_seg) = if zero_chars.contains(&four_a) {
-        (four_a, four_b)
-    } else {
-        (four_b, four_a)
-    };
+    let b_seg = zero_wires & bd_wires;
+    let d_seg = bd_wires & !zero_wires;
 
     // Now fixed the A, B, D, E, and G segments.
     // The 6 character only has F, not C. Check for one_chars in there.
-    let (c_seg, f_seg) = if six_chars.contains(&one_a) {
-        (one_b, one_a)
-    } else {
-        (one_a, one_b)
-    };
+    let f_seg = six_wires & cf_wires;
+    let c_seg = cf_wires & !six_wires;
 
-    let char_map: [[u8; 7]; 10] = [
+    let digit_map = [
         // 0
-        make_map(&[a_seg, b_seg, c_seg, e_seg, f_seg, g_seg]),
+        a_seg | b_seg | c_seg | e_seg | f_seg | g_seg,
         // 1
-        make_map(&[c_seg, f_seg]),
+        c_seg | f_seg,
         // 2
-        make_map(&[a_seg, c_seg, d_seg, e_seg, g_seg]),
+        a_seg | c_seg | d_seg | e_seg | g_seg,
         // 3
-        make_map(&[a_seg, c_seg, d_seg, f_seg, g_seg]),
+        a_seg | c_seg | d_seg | f_seg | g_seg,
         // 4
-        make_map(&[b_seg, c_seg, d_seg, f_seg]),
+        b_seg | c_seg | d_seg | f_seg,
         // 5
-        make_map(&[a_seg, b_seg, d_seg, f_seg, g_seg]),
+        a_seg | b_seg | d_seg | f_seg | g_seg,
         // 6
-        make_map(&[a_seg, b_seg, d_seg, e_seg, f_seg, g_seg]),
+        a_seg | b_seg | d_seg | e_seg | f_seg | g_seg,
         // 7
-        make_map(&[a_seg, c_seg, f_seg]),
+        a_seg | c_seg | f_seg,
         // 8
-        make_map(&[a_seg, b_seg, c_seg, d_seg, e_seg, f_seg, g_seg]),
+        a_seg | b_seg | c_seg | d_seg | e_seg | f_seg | g_seg,
         // 9
-        make_map(&[a_seg, b_seg, c_seg, d_seg, f_seg, g_seg]),
+        a_seg | b_seg | c_seg | d_seg | f_seg | g_seg,
     ];
 
     let mut sum = 0;
     for output in data.outputs {
         sum *= 10;
-        let segment_map: [u8; 7] = make_map(output.as_bytes());
+        let wires = encode(output);
 
-        for (map, n) in char_map.iter().zip(0..) {
-            if map != &segment_map {
-                continue;
+        for (&map, n) in digit_map.iter().zip(0..) {
+            if map == wires {
+                sum += n;
             }
-            sum += n;
         }
     }
 
